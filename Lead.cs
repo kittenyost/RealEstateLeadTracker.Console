@@ -1,5 +1,5 @@
 ﻿namespace RealEstateLeadTracker.Console
-{
+{ 
     public class Lead
     {
         public int LeadId { get; set; }
