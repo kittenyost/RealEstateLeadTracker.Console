@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace RealEstateLeadTracker.Console
 {
@@ -12,7 +13,65 @@ namespace RealEstateLeadTracker.Console
 
             var repo = new LeadRepository(connectionString);
 
-            // --- Test GetAll() ---
+            // ============================
+            // MILESTONE 4: BASELINE vs AFTER
+            // ============================
+
+            System.Console.WriteLine("======================================");
+            System.Console.WriteLine("W4 Milestone 4: Performance Measurement");
+            System.Console.WriteLine("Scenario: GetAll Leads + Notes");
+            System.Console.WriteLine("======================================\n");
+
+            // ---- BEFORE (Baseline: N+1 queries) ----
+            repo.ResetCommandCount();
+            var sw = Stopwatch.StartNew();
+
+            var before = repo.GetAllWithNotes_Baseline();
+
+            sw.Stop();
+
+            System.Console.WriteLine("=== BEFORE (Baseline: N+1 queries) ===");
+            System.Console.WriteLine($"Leads returned: {before.Count}");
+            System.Console.WriteLine($"Elapsed time (ms): {sw.ElapsedMilliseconds}");
+            System.Console.WriteLine($"Command count: {repo.CommandCount}");
+
+            // Show a tiny sample to confirm output correctness
+            if (before.Count > 0)
+            {
+                var first = before[0];
+                System.Console.WriteLine($"Sample Lead: Id={first.Lead.LeadId}, Name={first.Lead.FirstName} {first.Lead.LastName}, Notes={first.Notes.Count}");
+            }
+
+            System.Console.WriteLine();
+
+            // ---- AFTER (Optimized: 1 JOIN query) ----
+            repo.ResetCommandCount();
+            sw.Restart();
+
+            var after = repo.GetAllWithNotes_Optimized();
+
+            sw.Stop();
+
+            System.Console.WriteLine("=== AFTER (Optimized: 1 JOIN query) ===");
+            System.Console.WriteLine($"Leads returned: {after.Count}");
+            System.Console.WriteLine($"Elapsed time (ms): {sw.ElapsedMilliseconds}");
+            System.Console.WriteLine($"Command count: {repo.CommandCount}");
+
+            if (after.Count > 0)
+            {
+                var first = after[0];
+                System.Console.WriteLine($"Sample Lead: Id={first.Lead.LeadId}, Name={first.Lead.FirstName} {first.Lead.LastName}, Notes={first.Notes.Count}");
+            }
+
+            System.Console.WriteLine("\n======================================");
+            System.Console.WriteLine("END Milestone 4 Evidence");
+            System.Console.WriteLine("======================================\n");
+
+            // ======================================
+            // OPTIONAL: keep your interactive testing
+            // ======================================
+
+            // --- Test GetAll() (existing) ---
             List<Lead> allLeads = repo.GetAll();
             System.Console.WriteLine($"Retrieved {allLeads.Count} leads:");
             System.Console.WriteLine("-----------------------------------");
@@ -72,41 +131,14 @@ namespace RealEstateLeadTracker.Console
             System.Console.WriteLine($"Update success: {updateOk}");
 
             // --- Re-read from DB to prove change ---
-            Lead after = repo.GetById(id);
+            Lead updatedLead = repo.GetById(id);
 
             System.Console.WriteLine();
             System.Console.WriteLine("=== AFTER UPDATE ===");
             System.Console.WriteLine(
-                $"Id={after.LeadId}, Name={after.FirstName} {after.LastName}, Phone={after.Phone ?? "N/A"}, Email={after.Email ?? "N/A"}, Created={after.CreatedOn}"
+                $"Id={updatedLead.LeadId}, Name={updatedLead.FirstName} {updatedLead.LastName}, Phone={updatedLead.Phone ?? "N/A"}, Email={updatedLead.Email ?? "N/A"}, Created={updatedLead.CreatedOn}"
             );
 
-            // // --- Test DeleteLead() ---
-            //System.Console.WriteLine();
-            //System.Console.Write("Do you want to DELETE this lead now? (y/n): ");
-            //string deleteChoice = System.Console.ReadLine();
-
-            //if (!string.IsNullOrWhiteSpace(deleteChoice) &&
-            //    deleteChoice.Trim().Equals("y", StringComparison.OrdinalIgnoreCase))
-            //{
-            //    bool deleteOk = repo.DeleteLead(id);
-
-            //    System.Console.WriteLine();
-            //    System.Console.WriteLine("=== DELETE RESULT ===");
-            //    System.Console.WriteLine($"Delete success: {deleteOk}");
-
-            //    // Re-read to prove it’s gone
-            //    Lead afterDelete = repo.GetById(id);
-
-            //    System.Console.WriteLine();
-            //    System.Console.WriteLine("=== AFTER DELETE CHECK ===");
-            //    System.Console.WriteLine(afterDelete == null
-            //        ? "Lead is gone (GetById returned null)."
-            //        : "Lead still exists (delete failed).");
-            //}
-            //else
-            //{
-            //    System.Console.WriteLine("Skipped delete.");
-            //}
             // --- Test TRANSACTION (Update Lead + Add Note) ---
             System.Console.WriteLine();
             System.Console.WriteLine("=== TRANSACTION TEST ===");
