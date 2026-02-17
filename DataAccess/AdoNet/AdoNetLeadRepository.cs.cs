@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.Data.SqlClient;
 
-namespace RealEstateLeadTracker.Console
+namespace RealEstateLeadTracker.Console.DataAccess.AdoNet
 {
     // Simple container type for Milestone 4 scenario:
     // "Get all leads + their notes"
@@ -12,7 +12,7 @@ namespace RealEstateLeadTracker.Console
         public List<string> Notes { get; set; } = new List<string>();
     }
 
-    public class LeadRepository
+    public class AdoNetLeadRepository
     {
         private readonly string _connectionString;
 
@@ -59,7 +59,19 @@ WHERE LeadId = @LeadId;";
 DELETE FROM dbo.Leads
 WHERE LeadId = @Id;";
 
-        public LeadRepository(string connectionString)
+        private const string SqlUpdateLeadContact = @"
+UPDATE dbo.Leads
+SET Phone = @Phone,
+    Email = @Email
+WHERE LeadId = @LeadId;";
+
+        private const string SqlInsertLeadNote = @"
+INSERT INTO dbo.LeadNotes (LeadId, Note, CreatedOn)
+VALUES (@LeadId, @Note, GETDATE());";
+
+
+
+        public AdoNetLeadRepository(string connectionString)
         {
             _connectionString = connectionString;
         }
@@ -251,49 +263,47 @@ WHERE LeadId = @Id;";
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                var tx = conn.BeginTransaction();
 
-                try
+                using (var tx = conn.BeginTransaction())
                 {
-                    var updateCmd = new SqlCommand(@"
-UPDATE dbo.Leads
-SET Phone = @Phone,
-    Email = @Email
-WHERE LeadId = @LeadId;",
-                        conn, tx);
+                    try
+                    {
+                        using (var updateCmd = new SqlCommand(SqlUpdateLeadContact, conn, tx))
+                        {
+                            updateCmd.Parameters.AddWithValue("@LeadId", lead.LeadId);
 
-                    updateCmd.Parameters.AddWithValue("@LeadId", lead.LeadId);
-                    updateCmd.Parameters.AddWithValue("@Phone",
-                        string.IsNullOrWhiteSpace(lead.Phone) ? (object)DBNull.Value : lead.Phone);
-                    updateCmd.Parameters.AddWithValue("@Email",
-                        string.IsNullOrWhiteSpace(lead.Email) ? (object)DBNull.Value : lead.Email);
+                            updateCmd.Parameters.AddWithValue("@Phone",
+                                string.IsNullOrWhiteSpace(lead.Phone) ? (object)DBNull.Value : lead.Phone);
 
-                    CountCommand();
-                    int updated = updateCmd.ExecuteNonQuery();
-                    if (updated != 1)
+                            updateCmd.Parameters.AddWithValue("@Email",
+                                string.IsNullOrWhiteSpace(lead.Email) ? (object)DBNull.Value : lead.Email);
+
+                            CountCommand();
+                            int updated = updateCmd.ExecuteNonQuery();
+                            if (updated != 1)
+                            {
+                                tx.Rollback();
+                                return false;
+                            }
+                        }
+
+                        using (var noteCmd = new SqlCommand(SqlInsertLeadNote, conn, tx))
+                        {
+                            noteCmd.Parameters.AddWithValue("@LeadId", lead.LeadId);
+                            noteCmd.Parameters.AddWithValue("@Note", note);
+
+                            CountCommand();
+                            noteCmd.ExecuteNonQuery();
+                        }
+
+                        tx.Commit();
+                        return true;
+                    }
+                    catch
                     {
                         tx.Rollback();
-                        return false;
+                        throw;
                     }
-
-                    var noteCmd = new SqlCommand(@"
-INSERT INTO dbo.LeadNotes (LeadId, Note, CreatedOn)
-VALUES (@LeadId, @Note, GETDATE());",
-                        conn, tx);
-
-                    noteCmd.Parameters.AddWithValue("@LeadId", lead.LeadId);
-                    noteCmd.Parameters.AddWithValue("@Note", note);
-
-                    CountCommand();
-                    noteCmd.ExecuteNonQuery();
-
-                    tx.Commit();
-                    return true;
-                }
-                catch
-                {
-                    tx.Rollback();
-                    throw;
                 }
             }
         }

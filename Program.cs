@@ -1,8 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-
-namespace RealEstateLeadTracker.Console
+namespace RealEstateLeadTracker.Console.DataAccess.AdoNet
 {
     internal class Program
     {
@@ -11,7 +10,7 @@ namespace RealEstateLeadTracker.Console
             string connectionString =
                 "Server=LAPTOP-KATHY;Database=RealEstateLeadTracker;Trusted_Connection=True;TrustServerCertificate=True;";
 
-            var repo = new LeadRepository(connectionString);
+            var repo = new AdoNetLeadRepository(connectionString);
 
             // ============================
             // MILESTONE 4: BASELINE vs AFTER
