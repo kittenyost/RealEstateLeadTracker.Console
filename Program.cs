@@ -1,6 +1,9 @@
-﻿using System;
+﻿using RealEstateLeadTracker.Console.DataAccess.EfCore;
+using RealEstateLeadTracker.Console.EfCore.Context;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 namespace RealEstateLeadTracker.Console.DataAccess.AdoNet
 {
     internal class Program
@@ -149,9 +152,56 @@ namespace RealEstateLeadTracker.Console.DataAccess.AdoNet
 
             System.Console.WriteLine($"Transaction success: {txOk}");
 
+            // =============================
+            // WEEK 7: EF Core Write Ops Demo
+            // =============================
+            System.Console.WriteLine();
+            System.Console.WriteLine("=== WEEK 7: EF Core Write Operations ===");
+
+            var context = new ProjectDbContext();
+            var ef = new EfCoreLeadDataAccess(context);
+
+            // INSERT
+            var newLead = new Lead
+            {
+                FirstName = "Test",
+                LastName = "User",
+                Phone = "555-0000",
+                Email = "testuser@example.com"
+            };
+
+            System.Console.WriteLine("\n--- INSERT ---");
+            System.Console.WriteLine($"Before count: {ef.GetAll().Count}");
+            bool created = ef.CreateLead(newLead);
+            System.Console.WriteLine($"Create success: {created}");
+            System.Console.WriteLine($"After count: {ef.GetAll().Count}");
+
+            // Get inserted
+            var inserted = ef.GetAll().OrderByDescending(l => l.LeadId).First();
+
+            // UPDATE (Tracked)
+            System.Console.WriteLine("\n--- UPDATE (Tracked) ---");
+            System.Console.WriteLine($"Before: {inserted.LeadId} {inserted.FirstName}");
+
+            inserted.FirstName = "Updated";
+            bool updated = ef.UpdateLead(inserted);
+
+            var afterUpdate = ef.GetById(inserted.LeadId);
+            System.Console.WriteLine($"Update success: {updated}");
+            System.Console.WriteLine($"After: {afterUpdate?.LeadId} {afterUpdate?.FirstName}");
+
+            // DELETE
+            System.Console.WriteLine("\n--- DELETE ---");
+            bool deleted = ef.DeleteLead(inserted.LeadId);
+            System.Console.WriteLine($"Delete success: {deleted}");
+            System.Console.WriteLine($"Exists after delete? {ef.GetById(inserted.LeadId) != null}");
+
             System.Console.WriteLine();
             System.Console.WriteLine("Press any key to exit...");
             System.Console.ReadKey();
+
+
         }
+
     }
 }

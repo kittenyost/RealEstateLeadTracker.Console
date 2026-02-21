@@ -6,5 +6,10 @@ namespace RealEstateLeadTracker.Console.DataAccess.Interfaces
     {
         List<Lead> GetAll();
         Lead? GetById(int id);
+
+        bool CreateLead(Lead lead);
+        bool UpdateLead(Lead lead);
+        bool DeleteLead(int id);
     }
 }
+

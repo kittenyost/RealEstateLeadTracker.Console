@@ -15,7 +15,6 @@ public class EfCoreLeadDataAccess : IDataAccess
 
     public List<Lead> GetAll()
     {
-        // AsNoTracking is good for read-only
         return _db.Leads
             .AsNoTracking()
             .OrderBy(l => l.LeadId)
@@ -48,5 +47,34 @@ public class EfCoreLeadDataAccess : IDataAccess
             Email = l.Email,
             CreatedOn = l.CreatedOn
         };
+    }
+
+    public bool CreateLead(Lead lead)
+    {
+        _db.Leads.Add(lead);
+        return _db.SaveChanges() == 1;
+    }
+
+    public bool UpdateLead(Lead lead)
+    {
+        // TRACKED query (no AsNoTracking here)
+        var existing = _db.Leads.FirstOrDefault(x => x.LeadId == lead.LeadId);
+        if (existing == null) return false;
+
+        existing.FirstName = lead.FirstName;
+        existing.LastName = lead.LastName;
+        existing.Phone = lead.Phone;
+        existing.Email = lead.Email;
+
+        return _db.SaveChanges() == 1;
+    }
+
+    public bool DeleteLead(int id)
+    {
+        var existing = _db.Leads.FirstOrDefault(x => x.LeadId == id);
+        if (existing == null) return false;
+
+        _db.Leads.Remove(existing);
+        return _db.SaveChanges() == 1;
     }
 }
