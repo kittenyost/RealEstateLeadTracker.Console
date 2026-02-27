@@ -1,9 +1,15 @@
-﻿using RealEstateLeadTracker.Console.DataAccess.EfCore;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using RealEstateLeadTracker.Console.DataAccess.EfCore;
 using RealEstateLeadTracker.Console.EfCore.Context;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.Linq;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Runtime.InteropServices;
+using System.Diagnostics.Metrics;
 namespace RealEstateLeadTracker.Console.DataAccess.AdoNet
 {
     internal class Program
@@ -159,15 +165,22 @@ namespace RealEstateLeadTracker.Console.DataAccess.AdoNet
             System.Console.WriteLine("=== WEEK 7: EF Core Write Operations ===");
 
             var context = new ProjectDbContext();
+
+            // PROVE mapping + DB
+            var leadEntityType = context.Model.FindEntityType(typeof(RealEstateLeadTracker.Console.EfCore.Entities.Lead));
+            System.Console.WriteLine($"EF table for EF Lead entity = {leadEntityType?.GetTableName()}");
+            System.Console.WriteLine($"EF DB = {context.Database.GetDbConnection().Database}");
+
             var ef = new EfCoreLeadDataAccess(context);
 
-            // INSERT
-            var newLead = new Lead
+            // INSERT (domain Lead - matches IDataAccess contract)
+            var newLead = new RealEstateLeadTracker.Console.Lead
             {
                 FirstName = "Test",
                 LastName = "User",
                 Phone = "555-0000",
-                Email = "testuser@example.com"
+                Email = "testuser@example.com",
+                CreatedOn = DateTime.Now
             };
 
             System.Console.WriteLine("\n--- INSERT ---");
@@ -179,29 +192,82 @@ namespace RealEstateLeadTracker.Console.DataAccess.AdoNet
             // Get inserted
             var inserted = ef.GetAll().OrderByDescending(l => l.LeadId).First();
 
-            // UPDATE (Tracked)
-            System.Console.WriteLine("\n--- UPDATE (Tracked) ---");
-            System.Console.WriteLine($"Before: {inserted.LeadId} {inserted.FirstName}");
+            //// UPDATE (Tracked)
+            //System.Console.WriteLine("\n--- UPDATE (Tracked) ---");
+            //System.Console.WriteLine($"Before: {inserted.LeadId} {inserted.FirstName}");
 
-            inserted.FirstName = "Updated";
-            bool updated = ef.UpdateLead(inserted);
+            //inserted.FirstName = "Updated";
+            //bool updated = ef.UpdateLead(inserted);
 
-            var afterUpdate = ef.GetById(inserted.LeadId);
-            System.Console.WriteLine($"Update success: {updated}");
-            System.Console.WriteLine($"After: {afterUpdate?.LeadId} {afterUpdate?.FirstName}");
+            //var afterUpdate = ef.GetById(inserted.LeadId);
+            //System.Console.WriteLine($"Update success: {updated}");
+            //System.Console.WriteLine($"After: {afterUpdate?.LeadId} {afterUpdate?.FirstName}");
 
-            // DELETE
-            System.Console.WriteLine("\n--- DELETE ---");
-            bool deleted = ef.DeleteLead(inserted.LeadId);
-            System.Console.WriteLine($"Delete success: {deleted}");
-            System.Console.WriteLine($"Exists after delete? {ef.GetById(inserted.LeadId) != null}");
+            //// DELETE
+            //System.Console.WriteLine("\n--- DELETE ---");
+            //bool deleted = ef.DeleteLead(inserted.LeadId);
+            //System.Console.WriteLine($"Delete success: {deleted}");
+            //System.Console.WriteLine($"Exists after delete? {ef.GetById(inserted.LeadId) != null}");
 
+            // =============================
+            // WEEK 8: EF Core Relationship + Include() Demo
+            // =============================
+
+            // Ensure at least one note exists for the demo lead
             System.Console.WriteLine();
-            System.Console.WriteLine("Press any key to exit...");
-            System.Console.ReadKey();
+            System.Console.WriteLine("=== WEEK 8: EF Core Relationship + Include() ===");
 
+            // Get most recent LeadId
+            int demoLeadId = ef.GetAll()
+                .OrderByDescending(l => l.LeadId)
+                .Select(l => l.LeadId)
+                .FirstOrDefault();
+
+            if (demoLeadId == 0)
+            {
+                System.Console.WriteLine("No leads available to demo Include().");
+            }
+            else
+            {
+                // Ensure at least one note exists
+                var demoEntity = context.Set<RealEstateLeadTracker.Console.EfCore.Entities.Lead>()
+                    .FirstOrDefault(l => l.LeadId == demoLeadId);
+
+                if (demoEntity != null)
+                {
+                    context.Set<RealEstateLeadTracker.Console.EfCore.Entities.LeadNote>().Add(
+                        new RealEstateLeadTracker.Console.EfCore.Entities.LeadNote
+                        {
+                            LeadId = demoEntity.LeadId,
+                            Note = "Week 8 Include() demo note",
+                            CreatedOn = DateTime.Now
+                        }
+                    );
+                    context.SaveChanges();
+                }
+
+                // Now retrieve with Include()
+                var leadWithNotes = context.Set<RealEstateLeadTracker.Console.EfCore.Entities.Lead>()
+                    .Include(l => l.LeadNotes)
+                    .AsNoTracking()
+                    .FirstOrDefault(l => l.LeadId == demoLeadId);
+
+                System.Console.WriteLine($"LeadId: {demoLeadId}");
+                System.Console.WriteLine($"Lead found: {leadWithNotes != null}");
+
+                if (leadWithNotes != null)
+                {
+                    System.Console.WriteLine($"Name: {leadWithNotes.FirstName} {leadWithNotes.LastName}");
+                    System.Console.WriteLine($"Notes loaded via Include(): {leadWithNotes.LeadNotes?.Count ?? 0}");
+
+                    var firstNote = leadWithNotes.LeadNotes?.FirstOrDefault();
+                    if (firstNote != null)
+                    {
+                        System.Console.WriteLine($"Sample Note: Id={firstNote.LeadNoteId}, Text={firstNote.Note}");
+                    }
+                }
+            }
 
         }
-
     }
 }
